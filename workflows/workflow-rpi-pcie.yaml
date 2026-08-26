@@ -1,0 +1,69 @@
+id: 7389ec84-3c72-4fc2-96f0-73a96cb3faf5
+name: rpi-pcie
+description: >-
+  Read PCIe device link state from rpi-local and assert linkDegraded ==
+  false — the silent-performance-loss signal this model exists to catch
+  (link training down to a lower speed/width presents only as "my SSD is
+  mysteriously slow"). On this machine (no NVMe base attached yet) the
+  assert exercises the always-present internal RP1 link, which is expected
+  to stay healthy; re-verify against the actual NVMe device once the base
+  is physically attached. Scheduled every 5 minutes, the same cadence as
+  the other telemetry-focused extensions in this family.
+version: 1
+tags: {}
+trigger:
+  schedule: "*/5 * * * *"
+jobs:
+  - name: collect
+    description: Read PCIe device link state.
+    dependsOn: []
+    steps:
+      - name: readPcie
+        task:
+          type: model_method
+          modelIdOrName: rpi-local
+          methodName: readPcie
+        dependsOn: []
+
+  - name: assert
+    description: Fail the run when any PCIe device's link is degraded.
+    dependsOn:
+      - job: collect
+        condition:
+          type: completed
+    steps:
+      - name: link-not-degraded
+        allowFailure: false
+        task:
+          type: assert
+          expr: >-
+            data.latest("rpi-local", "pcie").attributes.linkDegraded == false
+          message: >-
+            PCIe link degraded: ${{ data.latest("rpi-local", "pcie").attributes.devices }} —
+            negotiated speed/width below capable on at least one device.
+            Silent performance loss made loud.
+          severity: high
+        dependsOn: []
+
+  - name: report
+    description: >-
+      Print a one-screen summary. Depends on collect only (not assert), so
+      it still runs when an assertion fails.
+    dependsOn:
+      - job: collect
+        condition:
+          type: completed
+    steps:
+      - name: summarize
+        task:
+          type: model_method
+          modelType: "command/shell"
+          modelName: rpi-pcie-summary
+          methodName: execute
+          inputs:
+            run: >-
+              echo "rpi-pcie: rpi-local" &&
+              echo "  devices: ${{ data.latest('rpi-local', 'pcie').attributes.devices }}" &&
+              echo "  linkDegraded: ${{ data.latest('rpi-local', 'pcie').attributes.linkDegraded }}" &&
+              echo "  hat: ${{ data.latest('rpi-local', 'pcie').attributes.hat }}"
+        dependsOn: []
