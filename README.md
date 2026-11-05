@@ -9,12 +9,12 @@ mysteriously slow." Zero privileges: every source is world-readable on
 this hardware (`lspci -vv`'s capability details need root here — sysfs
 doesn't, so sysfs is the primary source). Read-only.
 
-Built and tested against this Pi 5 with no NVMe base attached yet, so it
-always sees the internal Broadcom-to-RP1 link (which is never degraded on
-healthy hardware) rather than an NVMe device. The multi-device design
-deliberately generalizes to however many PCIe devices exist rather than
-assuming a single "the" device — it'll pick up an NVMe device the same way
-once one is attached, no changes needed.
+First built against this Pi 5 before any NVMe base was attached, when it
+only saw the internal Broadcom-to-RP1 link (which is never degraded on
+healthy hardware). The multi-device design deliberately generalizes to
+however many PCIe devices exist rather than assuming a single "the"
+device, so it picked up the NVMe SSD on the external PCIe port, and that
+port's bridge, with no changes once they were attached.
 
 ## Installation
 
@@ -54,11 +54,18 @@ expr: >-
   reads its `current_link_speed`/`max_link_speed`/`current_link_width`/
   `max_link_width`. Each device's `degraded` is `true` when negotiated is
   below capable on either speed or width, `null` (not a guessed `false`)
-  when either side couldn't be read. The top-level `linkDegraded` is
+  when either side couldn't be read. "Capable" is the lower of the
+  device's own max and its upstream port's max, read from the parent PCI
+  address in the device's resolved sysfs path. A link trains to the slower
+  of its two ends, so an x4 Gen 3 NVMe SSD behind the Pi 5's x1 Gen 2
+  external port is at full capability at x1 5 GT/s, not degraded. Before
+  2026.11.05.1, comparing against the endpoint's own max alone flagged
+  that permanently. A root port, or an upstream value that can't be read,
+  leaves the device's own max in place. The top-level `linkDegraded` is
   hoisted as the OR across every device's `degraded == true` — the field a
   workflow assert actually checks — rather than picking one "primary"
-  device, since which device matters (the internal RP1 link today, an NVMe
-  device once attached) isn't fixed.
+  device, since which device matters (the internal RP1 link or the NVMe
+  SSD) isn't fixed.
 
   `hat` reads the HAT+ ID EEPROM (`vendor`/`product`/`product_id`/`uuid`,
   each NUL-terminated) and is `null` when no HAT is attached — a normal,

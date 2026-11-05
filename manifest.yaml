@@ -1,6 +1,6 @@
 manifestVersion: 1
 name: "@aaronge/rpi-pcie"
-version: "2026.11.05.2"
+version: "2026.11.05.3"
 description: "Raspberry Pi 5 PCIe link health (negotiated vs. capable speed/width per device, HAT+ ID EEPROM, recent pcie dmesg lines) via sysfs, as a typed, versioned Swamp model — catches link training down to a lower speed/width, the common silent cause of a mysteriously slow NVMe SSD."
 
 repository: https://github.com/aaron-dernley/rpi-pcie
