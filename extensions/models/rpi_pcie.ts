@@ -133,6 +133,38 @@ export function parseLinkWidth(
   return value;
 }
 
+/**
+ * Cap a device's own capable (max) speed or width at its upstream port's.
+ * A link trains to the lower of its two ends, so an x4 Gen 3 NVMe behind
+ * the Pi 5's x1 Gen 2 external port is at full capability at x1 5 GT/s.
+ * Comparing against the endpoint's own max alone flagged that as degraded
+ * on every read. The value passes through unchanged when there is no
+ * upstream port (a root port) or its value is unknown.
+ */
+export function capToUpstream(
+  own: number | null,
+  upstream: number | null,
+): number | null {
+  if (own === null || upstream === null) return own;
+  return Math.min(own, upstream);
+}
+
+/** Return the upstream port's PCI address (the parent directory in the resolved sysfs path), or null for a root port or a non-sysfs path. */
+async function upstreamPortAddress(devicePath: string): Promise<string | null> {
+  const cmd = new Deno.Command("readlink", {
+    args: ["-f", devicePath],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const output = await cmd.output();
+  if (!output.success) return null;
+  const parts = new TextDecoder().decode(output.stdout).trim().split("/");
+  const parent = parts[parts.length - 2] ?? "";
+  return /^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$/i.test(parent)
+    ? parent
+    : null;
+}
+
 /** True when negotiated (current) is below capable (max) on either speed or width; null when either side is unknown. */
 export function computeDegraded(
   currentSpeed: number | null,
@@ -201,7 +233,9 @@ const PcieDeviceSchema = z.object({
   ),
   degraded: z.boolean().nullable().describe(
     "True when negotiated speed or width is below capable — the silent " +
-      "failure this model exists to catch. Null when speed/width on " +
+      "failure this model exists to catch. Capable is the lower of this " +
+      "device's own max and its upstream port's, since a link can't " +
+      "train past either end. Null when speed/width on " +
       "either side couldn't be read, rather than guessed as false.",
   ),
 });
@@ -353,11 +387,30 @@ export const model = {
             ? null
             : parseLinkWidth(maxWidthText, context.logger);
 
+          // Judge the link against what both ends can do, not the
+          // endpoint alone — see capToUpstream.
+          const upstream = await upstreamPortAddress(devicePath);
+          const upstreamPath = upstream === null
+            ? null
+            : `${pciDevicesBasePath}/${upstream}`;
+          const upstreamSpeedText = upstreamPath === null
+            ? null
+            : await readAttr(upstreamPath, "max_link_speed");
+          const upstreamWidthText = upstreamPath === null
+            ? null
+            : await readAttr(upstreamPath, "max_link_width");
+          const upstreamMaxSpeed = upstreamSpeedText === null
+            ? null
+            : parseLinkSpeedGtps(upstreamSpeedText, context.logger);
+          const upstreamMaxWidth = upstreamWidthText === null
+            ? null
+            : parseLinkWidth(upstreamWidthText, context.logger);
+
           const degraded = computeDegraded(
             currentLinkSpeedGtps,
-            maxLinkSpeedGtps,
+            capToUpstream(maxLinkSpeedGtps, upstreamMaxSpeed),
             currentLinkWidth,
-            maxLinkWidth,
+            capToUpstream(maxLinkWidth, upstreamMaxWidth),
           );
 
           if (degraded) {

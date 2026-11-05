@@ -9,6 +9,7 @@ import {
 } from "jsr:@swamp-club/swamp-testing@0.20260824.32";
 import {
   assertRaspberryPi5Hardware,
+  capToUpstream,
   computeDegraded,
   filterPcieDmesgLines,
   model,
@@ -83,6 +84,19 @@ Deno.test("computeDegraded is null (not false) when any side is unknown, rather 
   assertEquals(computeDegraded(5.0, null, 4, 4), null);
   assertEquals(computeDegraded(5.0, 5.0, null, 4), null);
   assertEquals(computeDegraded(5.0, 5.0, 4, null), null);
+});
+
+// --- capToUpstream ----------------------------------------------------------
+
+Deno.test("capToUpstream caps an x4 Gen 3 endpoint at the Pi 5's x1 Gen 2 upstream port", () => {
+  assertEquals(capToUpstream(4, 1), 1);
+  assertEquals(capToUpstream(8.0, 5.0), 5.0);
+  assertEquals(computeDegraded(5.0, capToUpstream(8.0, 5.0), 1, capToUpstream(4, 1)), false);
+});
+
+Deno.test("capToUpstream passes the device's own max through when there is no upstream value", () => {
+  assertEquals(capToUpstream(4, null), 4);
+  assertEquals(capToUpstream(null, 1), null);
 });
 
 // --- filterPcieDmesgLines ---------------------------------------------------
@@ -199,6 +213,30 @@ Deno.test("readPcie sets linkDegraded=true when a mocked device's negotiated spe
       args[0] === "/sys/bus/pci/devices/0001:01:00.0/max_link_width"
     ) {
       return { stdout: "4\n", code: 0 };
+    }
+    // Behind the Pi 5's x1 Gen 2 external port: capable becomes 5 GT/s x1,
+    // so the 2.5 GT/s training is still caught as degraded.
+    if (
+      command === "readlink" &&
+      args[1] === "/sys/bus/pci/devices/0001:01:00.0"
+    ) {
+      return {
+        stdout:
+          "/sys/devices/platform/axi/1000110000.pcie/pci0001:00/0001:00:00.0/0001:01:00.0\n",
+        code: 0,
+      };
+    }
+    if (
+      command === "cat" &&
+      args[0] === "/sys/bus/pci/devices/0001:00:00.0/max_link_speed"
+    ) {
+      return { stdout: "5.0 GT/s PCIe\n", code: 0 };
+    }
+    if (
+      command === "cat" &&
+      args[0] === "/sys/bus/pci/devices/0001:00:00.0/max_link_width"
+    ) {
+      return { stdout: "1\n", code: 0 };
     }
     if (command === "find" && args[0] === "/proc/device-tree/hat") {
       return { stdout: "", stderr: "No such file or directory", code: 1 };
