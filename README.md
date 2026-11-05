@@ -25,9 +25,9 @@ swamp extension pull @aaronge/rpi-pcie
 ## Usage
 
 ```sh
-swamp model create @aaronge/rpi-pcie rpi-local
+swamp model create @aaronge/rpi-pcie pcie-local
 
-swamp model method run rpi-local readPcie
+swamp model method run pcie-local readPcie
 ```
 
 The method writes one resource: `pcie`. Every field is described — run
@@ -37,7 +37,7 @@ Reference the latest snapshot from a workflow assert step or another model:
 
 ```yaml
 expr: >-
-  data.latest("rpi-local", "pcie").attributes.linkDegraded == false
+  data.latest("pcie-local", "pcie").attributes.linkDegraded == false
 ```
 
 ## Global arguments
@@ -79,7 +79,11 @@ form on earlier Pi models.
 
 ## Workflow
 
-The extension ships an `rpi-pcie` workflow: a `collect` job runs
+The workflow is listed under `workflows:` in `manifest.yaml`, so
+`swamp extension pull @aaronge/rpi-pcie` installs it alongside the model. It
+expects a model instance named `pcie-local`.
+
+The extension ships an `@aaronge/rpi-pcie` workflow: a `collect` job runs
 `readPcie`, an `assert` job fails the run when `linkDegraded == true`
 (`allowFailure: false` — silent performance loss made loud), and a
 `report` job prints a one-screen summary regardless of whether the assert

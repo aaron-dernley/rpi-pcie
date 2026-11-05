@@ -1,7 +1,7 @@
 type: '@aaronge/rpi-pcie'
 typeVersion: 2026.08.26.1
 id: 3d1cbdc6-92d2-4e51-8318-4ebdb85f7ee9
-name: rpi-local
+name: pcie-local
 version: 1
 tags: {}
 globalArguments: {}

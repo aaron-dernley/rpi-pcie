@@ -1,7 +1,7 @@
 id: 7389ec84-3c72-4fc2-96f0-73a96cb3faf5
-name: rpi-pcie
+name: "@aaronge/rpi-pcie"
 description: >-
-  Read PCIe device link state from rpi-local and assert linkDegraded ==
+  Read PCIe device link state from pcie-local and assert linkDegraded ==
   false — the silent-performance-loss signal this model exists to catch
   (link training down to a lower speed/width presents only as "my SSD is
   mysteriously slow"). On this machine (no NVMe base attached yet) the
@@ -21,7 +21,7 @@ jobs:
       - name: readPcie
         task:
           type: model_method
-          modelIdOrName: rpi-local
+          modelIdOrName: pcie-local
           methodName: readPcie
         dependsOn: []
 
@@ -37,9 +37,9 @@ jobs:
         task:
           type: assert
           expr: >-
-            data.latest("rpi-local", "pcie").attributes.linkDegraded == false
+            data.latest("pcie-local", "pcie").attributes.linkDegraded == false
           message: >-
-            PCIe link degraded: ${{ data.latest("rpi-local", "pcie").attributes.devices }} —
+            PCIe link degraded: ${{ data.latest("pcie-local", "pcie").attributes.devices }} —
             negotiated speed/width below capable on at least one device.
             Silent performance loss made loud.
           severity: high
@@ -62,8 +62,8 @@ jobs:
           methodName: execute
           inputs:
             run: >-
-              echo "rpi-pcie: rpi-local" &&
-              echo "  devices: ${{ data.latest('rpi-local', 'pcie').attributes.devices }}" &&
-              echo "  linkDegraded: ${{ data.latest('rpi-local', 'pcie').attributes.linkDegraded }}" &&
-              echo "  hat: ${{ data.latest('rpi-local', 'pcie').attributes.hat }}"
+              echo "rpi-pcie: pcie-local" &&
+              echo "  devices: ${{ data.latest('pcie-local', 'pcie').attributes.devices }}" &&
+              echo "  linkDegraded: ${{ data.latest('pcie-local', 'pcie').attributes.linkDegraded }}" &&
+              echo "  hat: ${{ data.latest('pcie-local', 'pcie').attributes.hat }}"
         dependsOn: []
